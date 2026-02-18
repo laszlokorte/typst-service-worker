@@ -1,7 +1,31 @@
-= This is a typst document
 
-Hello me!
+#set text(font: "PT Sans")
+#show link: underline
 
-== Some image
 
-#image("/foo.jpg")
+#image("/favicon.svg", width: 4cm)
+
+= Hello Typst!
+
+simple online #link("https://typst.app/")[typst] editor
+
+
+#link("http://laszlokorte.de")[Laszlo Korte]
+
+#lorem(30)
+
+#table(columns: 5,
+  stroke: none,
+table.header(
+    [*Column*], [*Volume*], [*Parameters*], [*foo*], [*bar*]
+),..range(5 * 3).map(n => numbering("A", n + 1)))
+
+#set text(size: 20pt)
+
+$ X(omega) = sum_(n=-infinity)^infinity x(n) dot e^(-j pi omega n) $
+
+#set text(size: 10pt)
+
+$ X(z) = sum_(n=-infinity)^infinity x(n) dot z^(-n) $
+
+#image("/foo.jpg", width: 7cm)
