@@ -1,0 +1,7 @@
+= This is a typst document
+
+Hello me!
+
+== Some image
+
+#image("/foo.jpg")
