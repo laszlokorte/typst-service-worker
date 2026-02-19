@@ -1,5 +1,7 @@
 # Experiment for rendering Typst in ServiceWorker
 
+![preview.svg](Preview of the generated SVG)
+
 Run local web server:
 
 ```sh

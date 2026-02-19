@@ -106,10 +106,7 @@ self.addEventListener("fetch", (event) => {
       }),
     );
   } else if (url.pathname.endsWith(".pdf")) {
-    const newUrl = new URL(
-      url.pathname.replace(/\.pdf$/, ".typst"),
-      url.origin,
-    );
+    const newUrl = new URL(url.pathname.replace(/\.pdf$/, ""), url.origin);
     event.respondWith(
       fetch(
         new Request(newUrl, {
@@ -136,46 +133,11 @@ self.addEventListener("fetch", (event) => {
           });
         })
         .catch((e) => {
-          console.error("Foo", e);
-          return fetch(event.request.clone());
-        }),
-    );
-  } else if (url.pathname.endsWith(".png")) {
-    const newUrl = new URL(url.pathname.replace(/\.png/, ".typst"), url.origin);
-    event.respondWith(
-      fetch(
-        new Request(newUrl, {
-          method: event.request.method,
-          headers: event.request.headers,
-          body:
-            event.request.method !== "GET" && event.request.method !== "HEAD"
-              ? event.request.body
-              : undefined,
-          redirect: "follow",
-          credentials: "same-origin",
-        }),
-      )
-        .then(async (r) => {
-          if (!r.ok) {
-            return r;
-          }
-          const t = await r.text();
-
-          return (await getTypst())
-            .canvas({ mainContent: t })
-            .then((pdfData) => {
-              return new Response(pdfData, {
-                headers: { "Content-Type": "image/png" },
-              });
-            });
-        })
-        .catch((e) => {
-          console.error("Foo", e);
           return fetch(event.request.clone());
         }),
     );
   } else if (url.pathname.endsWith(".svg")) {
-    const newUrl = new URL(url.pathname.replace(/\.svg/, ".typst"), url.origin);
+    const newUrl = new URL(url.pathname.replace(/\.svg/, ""), url.origin);
     event.respondWith(
       fetch(
         new Request(newUrl, {
@@ -225,7 +187,6 @@ self.addEventListener("fetch", (event) => {
           });
         })
         .catch((e) => {
-          console.error("Foo", e);
           return fetch(event.request.clone());
         }),
     );
