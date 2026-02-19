@@ -23,7 +23,7 @@ async function getTypst() {
     return cachedTypes;
   }
   const all = await Promise.all([
-    fetch("/assets.txt").then(async (r) => {
+    fetch("./assets.txt").then(async (r) => {
       const text = await r.text();
       const files = text.split("\n").filter((f) => f.length);
       return Promise.all(
@@ -34,10 +34,10 @@ async function getTypst() {
         }),
       );
     }),
-    fetch("/fonts.txt").then(async (fs) => {
+    fetch("./fonts.txt").then(async (fs) => {
       const fonts = (await fs.text()).split("\n").filter((f_2) => f_2);
 
-      const fetchBackend = new FetchAccessModel("/");
+      const fetchBackend = new FetchAccessModel("./");
       TypstSnippet.ccOptions = {
         getModule: () => "./typst_ts_web_compiler_bg.wasm",
       };

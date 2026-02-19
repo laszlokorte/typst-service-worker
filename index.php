@@ -7,8 +7,8 @@
   <title>Typst in Service worker</title>
 
   <script type="module">
-  navigator.serviceWorker.register('/worker.js', {
-    scope: '/',
+  navigator.serviceWorker.register('./worker.js', {
+    scope: './',
     type: "module",
   }).then((s) => {
     s.update()
