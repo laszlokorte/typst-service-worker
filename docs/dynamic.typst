@@ -3,7 +3,6 @@
 #show link: underline
 
 
-#image("/favicon.svg", width: 4cm)
 
 = Hello Typst!
 

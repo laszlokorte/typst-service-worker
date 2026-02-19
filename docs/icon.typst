@@ -1,0 +1,2 @@
+#set page(width: 4cm, height: 4cm, margin: 0cm)
+#image("/favicon.svg", width: 4cm)

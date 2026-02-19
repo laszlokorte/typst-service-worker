@@ -1,4 +1,8 @@
-import { $typst, TypstSnippet, FetchAccessModel } from "./typst-all.js";
+import {
+  TypstSnippet,
+  FetchAccessModel,
+  createTypstSvgRenderer,
+} from "./typst-all.js";
 
 export function preloadRemoteFonts(userFonts, options) {
   const loader = async (_, { ref, builder }) => {
@@ -12,41 +16,81 @@ export function preloadRemoteFonts(userFonts, options) {
   return loader;
 }
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    Promise.all([
-      fetch("/assets.txt").then(async (r) => {
-        const text = await r.text();
-        const files = text.split("\n").filter((f) => f.length);
-        return Promise.all(
-          files.map(async (f) => {
-            const r = await fetch(f);
-            r.arrayBuffer().then((b) => {
-              $typst.mapShadow(f, new Uint8Array(b));
-            });
-          }),
-        );
-      }),
-      fetch("/fonts.txt").then(async (fs) => {
-        const fonts = (await fs.text()).split("\n").filter((f) => f);
+let cachedTypes = null;
 
-        $typst.setCompilerInitOptions({
-          getModule: () => "./typst_ts_web_compiler_bg.wasm",
-          beforeBuild: [preloadRemoteFonts(fonts.map((f) => `./fonts/${f}`))],
-        });
-        $typst.setRendererInitOptions({
-          getModule: () => "./typst_ts_renderer_bg.wasm",
-        });
-      }),
-    ]),
-  );
-  self.skipWaiting(); // optional
+async function getTypst() {
+  if (cachedTypes) {
+    return cachedTypes;
+  }
+  const all = await Promise.all([
+    fetch("/assets.txt").then(async (r) => {
+      const text = await r.text();
+      const files = text.split("\n").filter((f) => f.length);
+      return Promise.all(
+        files.map(async (f_1) => {
+          const r_1 = await fetch(f_1);
+          const d = await r_1.arrayBuffer();
+          return { file: f_1, data: d };
+        }),
+      );
+    }),
+    fetch("/fonts.txt").then(async (fs) => {
+      const fonts = (await fs.text()).split("\n").filter((f_2) => f_2);
+
+      const fetchBackend = new FetchAccessModel("/");
+      TypstSnippet.ccOptions = {
+        getModule: () => "./typst_ts_web_compiler_bg.wasm",
+      };
+      const typeInstance = new TypstSnippet({
+        compiler: TypstSnippet.buildLocalCompiler,
+        renderer: TypstSnippet.buildLocalRenderer,
+      });
+
+      typeInstance.use({
+        key: "access-model",
+        forRoles: ["compiler"],
+        provides: [
+          (A, I) => {
+            return new Promise((C) => {
+              (I.builder.set_access_model(
+                fetchBackend,
+                async (Q) => {
+                  const E = await fetchBackend.getMTime(Q);
+                  return E ? E.getTime() : 0;
+                },
+                (Q_1) => fetchBackend.isFile(Q_1) || !1,
+                (Q_2) => fetchBackend.getRealPath(Q_2) || Q_2,
+                async (Q_3) => await fetchBackend.readAll(Q_3),
+              ),
+                C());
+            });
+          },
+        ],
+      });
+      typeInstance.setCompilerInitOptions({
+        getModule: () => "./typst_ts_web_compiler_bg.wasm",
+        beforeBuild: [preloadRemoteFonts(fonts.map((f_3) => `./fonts/${f_3}`))],
+      });
+      typeInstance.setRendererInitOptions({
+        getModule: () => "./typst_ts_renderer_bg.wasm",
+      });
+      return typeInstance;
+    }),
+  ]);
+  const [assets, typstInstance] = all;
+  for (let a of assets) {
+    await typstInstance.mapShadow(a.file, new Uint8Array(a.data));
+  }
+  cachedTypes = typstInstance;
+  return typstInstance;
+}
+
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  self.clients.claim(); // optional
-  // const fetchBackend = new FetchAccessModel(import.meta.url);
-  // $typst.use(TypstSnippet.withAccessModel(fetchBackend));
+  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener("fetch", (event) => {
@@ -85,19 +129,11 @@ self.addEventListener("fetch", (event) => {
           }
           const t = await r.text();
 
-          return $typst
-            .pdf({ mainContent: t })
-            .then((pdfData) => {
-              return new Response(pdfData, {
-                headers: { "Content-Type": "application/pdf" },
-              });
-            })
-            .catch((e) => {
-              console.error(e);
-              return new Response("Typst Error: " + e.toString(), {
-                headers: { "Content-Type": "text/plain" },
-              });
+          return (await getTypst()).pdf({ mainContent: t }).then((pdfData) => {
+            return new Response(pdfData, {
+              headers: { "Content-Type": "application/pdf" },
             });
+          });
         })
         .catch((e) => {
           console.error("Foo", e);
@@ -125,16 +161,11 @@ self.addEventListener("fetch", (event) => {
           }
           const t = await r.text();
 
-          return $typst
+          return (await getTypst())
             .canvas({ mainContent: t })
             .then((pdfData) => {
               return new Response(pdfData, {
                 headers: { "Content-Type": "image/png" },
-              });
-            })
-            .catch((e) => {
-              return new Response("Typst Error: " + e.toString(), {
-                headers: { "Content-Type": "text/plain" },
               });
             });
         })
@@ -164,41 +195,34 @@ self.addEventListener("fetch", (event) => {
           }
           const t = await r.text();
 
-          return $typst
-            .svg({ mainContent: t })
-            .then((pdfData) => {
-              return new Response(
-                pdfData.replace(
-                  /<(script|style)([^>]*)>([\s\S]*?)<\/\1>/gi,
-                  (_, tag, attrs, content) =>
-                    `<${tag}${attrs}><![CDATA[${content
-                      .replace(/document\.body/g, "document.rootElement")
-                      .replace(/"span"/g, '"text"')
-                      .replace(/addEventListener\("/g, (c) => c + "_")
-                      .replace(
-                        /createElement\(/g,
-                        (c) => "createElementNS('http://www.w3.org/2000/svg',",
-                      )
-                      .replace(
-                        'document.getElementsByTagName("head")[0]',
-                        "document.rootElement",
-                      )
-                      .replace(/\&gt;/g, ">")
-                      .replace(/\&lt;/g, "<")
-                      .replace(/\&nbsp;/g, " ")
-                      .split(";")
-                      .join(";\n")}]]></${tag}>`,
-                ),
-                {
-                  headers: { "Content-Type": "image/svg+xml" },
-                },
-              );
-            })
-            .catch((e) => {
-              return new Response("Typst Error: " + e.toString(), {
-                headers: { "Content-Type": "text/plain" },
-              });
-            });
+          return (await getTypst()).svg({ mainContent: t }).then((pdfData) => {
+            return new Response(
+              pdfData.replace(
+                /<(script|style)([^>]*)>([\s\S]*?)<\/\1>/gi,
+                (_, tag, attrs, content) =>
+                  `<${tag}${attrs}><![CDATA[${content
+                    .replace(/document\.body/g, "document.rootElement")
+                    .replace(/"span"/g, '"text"')
+                    .replace(/addEventListener\("/g, (c) => c + "_")
+                    .replace(
+                      /createElement\(/g,
+                      (c) => "createElementNS('http://www.w3.org/2000/svg',",
+                    )
+                    .replace(
+                      'document.getElementsByTagName("head")[0]',
+                      "document.rootElement",
+                    )
+                    .replace(/\&gt;/g, ">")
+                    .replace(/\&lt;/g, "<")
+                    .replace(/\&nbsp;/g, " ")
+                    .split(";")
+                    .join(";\n")}]]></${tag}>`,
+              ),
+              {
+                headers: { "Content-Type": "image/svg+xml" },
+              },
+            );
+          });
         })
         .catch((e) => {
           console.error("Foo", e);
