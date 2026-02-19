@@ -1,6 +1,6 @@
 # Experiment for rendering Typst in ServiceWorker
 
-![preview.svg](Preview of the generated SVG)
+![Preview of the generated SVG](./preview.svg)
 
 Run local web server:
 
